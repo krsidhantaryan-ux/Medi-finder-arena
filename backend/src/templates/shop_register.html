@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Register Your Pharmacy — MediFinder Partner Network{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-lg rounded-4 p-4 p-md-5 bg-white">
+        <div class="text-center mb-4">
+          <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-semibold mb-2">
+            <i class="bi bi-hospital me-1"></i> Chemist & Retailer Onboarding
+          </span>
+          <h3 class="fw-bold">Register Your Pharmacy</h3>
+          <p class="text-muted small">Connect your inventory to thousands of patients searching for medicines in your city.</p>
+        </div>
+
+        <form action="{{ url_for('pharmacy_web.register') }}" method="POST" enctype="multipart/form-data">
+          <!-- Basic Details -->
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-shop me-1"></i> 1. Store & Contact Information</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">PHARMACY / STORE NAME</label>
+              <input type="text" name="name" class="form-control" placeholder="e.g. Apollo Pharmacy Boring Road" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">OWNER / PROPRIETOR NAME</label>
+              <input type="text" name="owner_name" class="form-control" placeholder="e.g. Rajeev Mehta" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">BUSINESS EMAIL</label>
+              <input type="email" name="email" class="form-control" placeholder="store@example.com" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">PHONE NUMBER (PUBLIC CONTACT)</label>
+              <input type="tel" name="phone" class="form-control" placeholder="+91 98000 12345" required>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label small fw-bold text-muted">PORTAL PASSWORD</label>
+              <input type="password" name="password" class="form-control" minlength="6" placeholder="••••••••" required>
+            </div>
+          </div>
+
+          <!-- Licensing & Compliance -->
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-shield-check me-1"></i> 2. Drug License & Verification</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">DRUG LICENSE NUMBER</label>
+              <input type="text" name="license_number" class="form-control" placeholder="DL-PT-20-BRD-00123" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">UPLOAD LICENSE CERTIFICATE (IMAGE/PDF)</label>
+              <input type="file" name="license_image" class="form-control" accept="image/*,.pdf">
+            </div>
+          </div>
+
+          <!-- Location & Timings -->
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-geo-alt me-1"></i> 3. Address & Operating Hours</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-12">
+              <label class="form-label small fw-bold text-muted">STREET ADDRESS</label>
+              <input type="text" name="address" class="form-control" placeholder="Shop 4, Main Market Road" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">CITY</label>
+              <input type="text" name="city" class="form-control" value="Patna" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">STATE</label>
+              <input type="text" name="state" class="form-control" value="Bihar" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">PINCODE</label>
+              <input type="text" name="pincode" class="form-control" placeholder="800001" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">LATITUDE</label>
+              <input type="number" step="any" name="lat" id="regLat" class="form-control" value="25.6110" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">LONGITUDE</label>
+              <input type="number" step="any" name="lng" id="regLng" class="form-control" value="85.1430" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">OPENING TIME</label>
+              <input type="time" name="open_time" class="form-control" value="08:00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">CLOSING TIME</label>
+              <input type="time" name="close_time" class="form-control" value="22:00">
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" name="is_open_24h" id="is24h">
+                <label class="form-check-label fw-semibold" for="is24h">Open 24 Hours</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" name="delivery" id="hasDelivery">
+                <label class="form-check-label fw-semibold" for="hasDelivery">Offer Home Delivery</label>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 py-3 fw-semibold fs-6">
+            Submit Pharmacy Application for Review
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    MediFinder.initGeolocation((coords) => {
+      const latInput = document.getElementById("regLat");
+      const lngInput = document.getElementById("regLng");
+      if (latInput && lngInput) {
+        latInput.value = coords.lat.toFixed(6);
+        lngInput.value = coords.lng.toFixed(6);
+      }
+    });
+  });
+</script>
+{% endblock %}

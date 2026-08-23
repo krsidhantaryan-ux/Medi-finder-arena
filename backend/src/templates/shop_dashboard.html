@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Pharmacy Management Dashboard — MediFinder{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-5">
+  <!-- Pharmacy Header & Status Banner -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <h3 class="fw-bold mb-0">{{ shop.name }}</h3>
+        {% if shop.status == 'Approved' %}
+          <span class="badge badge-approved"><i class="bi bi-patch-check-fill me-1"></i> Verified & Active</span>
+        {% elif shop.status == 'Pending' %}
+          <span class="badge badge-pending"><i class="bi bi-hourglass-split me-1"></i> Awaiting Admin Verification</span>
+        {% else %}
+          <span class="badge badge-rejected"><i class="bi bi-x-circle me-1"></i> Application Rejected</span>
+        {% endif %}
+      </div>
+      <p class="text-muted small mb-0"><i class="bi bi-geo-alt me-1"></i> {{ shop.address }} &bull; <i class="bi bi-telephone me-1"></i> {{ shop.phone }}</p>
+    </div>
+
+    <div class="d-flex gap-2 mt-3 mt-md-0">
+      <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#addMedModal">
+        <i class="bi bi-plus-circle me-1"></i> Add Medicine
+      </button>
+      <a href="{{ url_for('pharmacy_web.profile') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-gear me-1"></i> Store Settings
+      </a>
+    </div>
+  </div>
+
+  {% if shop.status == 'Pending' %}
+    <div class="alert alert-warning border-warning border-opacity-25 rounded-3 mb-4">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      Your pharmacy is currently in the verification queue. You can prepare and manage your medicine catalog below, which will go live on search once approved by administrators.
+    </div>
+  {% endif %}
+
+  <!-- KPI Overview -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+        <div class="text-muted small fw-bold">TOTAL MEDICINES</div>
+        <h3 class="fw-bold text-primary mb-0 mt-1">{{ stats.total_items }}</h3>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+        <div class="text-muted small fw-bold">PENDING RESERVATIONS</div>
+        <h3 class="fw-bold text-warning mb-0 mt-1">{{ stats.pending_reservations }}</h3>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+        <div class="text-muted small fw-bold">LOW STOCK (≤ 5)</div>
+        <h3 class="fw-bold text-danger mb-0 mt-1">{{ stats.low_stock }}</h3>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+        <div class="text-muted small fw-bold">OUT OF STOCK</div>
+        <h3 class="fw-bold text-muted mb-0 mt-1">{{ stats.out_of_stock }}</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Tabs: Inventory & Reservations -->
+  <div class="card border-0 shadow-sm rounded-4 bg-white p-3 p-md-4">
+    <ul class="nav nav-pills mb-4" id="dashboardTabs" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link active fw-semibold" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventoryTab">
+          <i class="bi bi-capsule me-1"></i> Inventory Catalog ({{ inventory|length }})
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link fw-semibold" id="reservations-tab" data-bs-toggle="tab" data-bs-target="#reservationsTab">
+          <i class="bi bi-bag-check me-1"></i> Customer Reservations ({{ reservations|length }})
+          {% if stats.pending_reservations > 0 %}
+            <span class="badge bg-danger rounded-pill ms-1">{{ stats.pending_reservations }}</span>
+          {% endif %}
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="dashboardTabsContent">
+      <!-- Inventory Tab -->
+      <div class="tab-pane fade show active" id="inventoryTab">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <input type="text" id="dashInventoryFilter" class="form-control form-control-sm w-50" placeholder="Filter medicines by name or salt...">
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle table-hover custom-table" id="dashInventoryTable">
+            <thead>
+              <tr>
+                <th>Medicine Name</th>
+                <th>Generic Salt</th>
+                <th>Batch / Expiry</th>
+                <th>Price (₹)</th>
+                <th>Stock Quantity</th>
+                <th>Rx</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in inventory %}
+                <tr>
+                  <td class="fw-bold text-dark">{{ item.med_name }}</td>
+                  <td class="small text-muted">{{ item.salt_composition or '—' }}</td>
+                  <td class="small">{{ item.batch_no or '—' }}<br><span class="text-muted">{{ item.expiry_date or '—' }}</span></td>
+                  <td>
+                    <span class="fw-bold">₹{{ "%.2f"|format(item.price) }}</span>
+                    {% if item.mrp and item.mrp > item.price %}
+                      <span class="small text-muted text-decoration-line-through">₹{{ "%.2f"|format(item.mrp) }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if item.stock_quantity == 0 %}
+                      <span class="badge bg-danger">0 Out of Stock</span>
+                    {% elif item.stock_quantity <= 5 %}
+                      <span class="badge bg-warning text-dark">{{ item.stock_quantity }} Low Stock</span>
+                    {% else %}
+                      <span class="badge bg-success">{{ item.stock_quantity }} Available</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if item.prescription %}
+                      <span class="badge bg-warning-subtle text-warning-emphasis">Rx</span>
+                    {% else %}
+                      <span class="badge bg-light text-muted border">OTC</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditModal('{{ item.id }}', '{{ item.med_name|escape }}', '{{ item.salt_composition|escape }}', '{{ item.price }}', '{{ item.mrp }}', '{{ item.stock_quantity }}', '{{ item.dosage|escape }}', '{{ item.batch_no|escape }}', '{{ item.expiry_date }}', {{ 1 if item.prescription else 0 }})">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <form action="{{ url_for('pharmacy_web.delete_inventory', item_id=item.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Remove {{ item.med_name }} from inventory?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="7" class="text-center py-4 text-muted">No medicines in inventory yet. Click "+ Add Medicine" to begin.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reservations Tab -->
+      <div class="tab-pane fade" id="reservationsTab">
+        <div class="table-responsive">
+          <table class="table align-middle custom-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Medicine & Quantity</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th>Hold Until</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in reservations %}
+                <tr>
+                  <td>
+                    <div class="fw-bold">{{ r.customer_name or 'Walk-in Customer' }}</div>
+                    <div class="small text-primary"><i class="bi bi-telephone me-1"></i> {{ r.customer_phone }}</div>
+                  </td>
+                  <td>
+                    <div class="fw-semibold">{{ r.med_name }} ({{ r.quantity }} unit{{ 's' if r.quantity > 1 else '' }})</div>
+                    <div class="small text-muted">Total: ₹{{ "%.2f"|format(r.price * r.quantity) }}</div>
+                  </td>
+                  <td class="small text-muted">{{ r.created_at[:16].replace('T', ' ') if r.created_at else '—' }}</td>
+                  <td>
+                    {% if r.status == 'Pending' %}
+                      <span class="badge badge-pending">Pending Pickup</span>
+                    {% elif r.status == 'Confirmed' %}
+                      <span class="badge badge-confirmed">Confirmed</span>
+                    {% elif r.status == 'Collected' %}
+                      <span class="badge badge-approved">Collected</span>
+                    {% elif r.status == 'Cancelled' %}
+                      <span class="badge badge-rejected">Cancelled</span>
+                    {% endif %}
+                  </td>
+                  <td class="small">{{ r.held_until[:16].replace('T', ' ') if r.held_until else '—' }}</td>
+                  <td class="text-end">
+                    {% if r.status in ['Pending', 'Confirmed'] %}
+                      <div class="btn-group btn-group-sm">
+                        {% if r.status == 'Pending' %}
+                          <form action="{{ url_for('pharmacy_web.reservation_action', rid=r.id, action='confirm') }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-success"><i class="bi bi-check2"></i> Confirm</button>
+                          </form>
+                        {% endif %}
+                        <form action="{{ url_for('pharmacy_web.reservation_action', rid=r.id, action='collect') }}" method="POST" class="d-inline ms-1">
+                          <button type="submit" class="btn btn-primary"><i class="bi bi-bag-check"></i> Collected</button>
+                        </form>
+                        <form action="{{ url_for('pharmacy_web.reservation_action', rid=r.id, action='cancel') }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Cancel reservation and restock?');">
+                          <button type="submit" class="btn btn-outline-danger">Cancel</button>
+                        </form>
+                      </div>
+                    {% else %}
+                      <span class="text-muted small">Completed</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="6" class="text-center py-4 text-muted">No reservations recorded yet.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Medicine Modal -->
+<div class="modal fade" id="addMedModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-primary"><i class="bi bi-capsule me-1"></i> Add Medicine to Inventory</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="{{ url_for('pharmacy_web.add_inventory') }}" method="POST">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">MEDICINE / BRAND NAME</label>
+              <input type="text" name="med_name" class="form-control" placeholder="e.g. Dolo 650" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">GENERIC / SALT COMPOSITION</label>
+              <input type="text" name="salt_composition" class="form-control" placeholder="e.g. Paracetamol">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">CATEGORY</label>
+              <select name="category_slug" class="form-select">
+                {% for name, slug, icon in categories %}
+                  <option value="{{ slug }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">MANUFACTURER</label>
+              <input type="text" name="manufacturer" class="form-control" placeholder="e.g. Micro Labs">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">DOSAGE / PACKAGING</label>
+              <input type="text" name="dosage" class="form-control" placeholder="e.g. 650mg, 15 tablets">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-muted">SELLING PRICE (₹)</label>
+              <input type="number" step="0.01" name="price" class="form-control" placeholder="30.50" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-muted">MRP (₹)</label>
+              <input type="number" step="0.01" name="mrp" class="form-control" placeholder="32.00">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-muted">STOCK QUANTITY</label>
+              <input type="number" name="stock_quantity" class="form-control" value="50" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-muted">BATCH NUMBER</label>
+              <input type="text" name="batch_no" class="form-control" placeholder="BT-202601">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">EXPIRY DATE</label>
+              <input type="date" name="expiry_date" class="form-control">
+            </div>
+            <div class="col-md-6 d-flex align-items-center">
+              <div class="form-check form-switch mt-3">
+                <input class="form-check-input" type="checkbox" name="prescription" id="addRx">
+                <label class="form-check-label fw-semibold" for="addRx">Requires Doctor Prescription (Rx)</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Save Medicine</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Medicine Modal -->
+<div class="modal fade" id="editMedModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-primary"><i class="bi bi-pencil me-1"></i> Edit Inventory Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editMedForm" method="POST">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">MEDICINE / BRAND NAME</label>
+              <input type="text" name="med_name" id="editName" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">GENERIC / SALT COMPOSITION</label>
+              <input type="text" name="salt_composition" id="editSalt" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">DOSAGE / PACKAGING</label>
+              <input type="text" name="dosage" id="editDosage" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">SELLING PRICE (₹)</label>
+              <input type="number" step="0.01" name="price" id="editPrice" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">MRP (₹)</label>
+              <input type="number" step="0.01" name="mrp" id="editMrp" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">STOCK QUANTITY</label>
+              <input type="number" name="stock_quantity" id="editStock" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">BATCH NUMBER</label>
+              <input type="text" name="batch_no" id="editBatch" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">EXPIRY DATE</label>
+              <input type="date" name="expiry_date" id="editExpiry" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" name="prescription" id="editRx">
+                <label class="form-check-label fw-semibold" for="editRx">Requires Doctor Prescription (Rx)</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" name="is_active" id="editActive" checked>
+                <label class="form-check-label fw-semibold" for="editActive">Active in Public Search</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Update Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.getElementById("dashInventoryFilter").addEventListener("input", (e) => {
+    const term = e.target.value.toLowerCase();
+    const rows = document.querySelectorAll("#dashInventoryTable tbody tr");
+    rows.forEach(r => {
+      r.style.display = r.innerText.toLowerCase().includes(term) ? "" : "none";
+    });
+  });
+
+  function openEditModal(id, name, salt, price, mrp, stock, dosage, batch, expiry, rx) {
+    document.getElementById("editMedForm").action = `/pharmacy/inventory/${id}/update`;
+    document.getElementById("editName").value = name;
+    document.getElementById("editSalt").value = salt;
+    document.getElementById("editPrice").value = price;
+    document.getElementById("editMrp").value = mrp;
+    document.getElementById("editStock").value = stock;
+    document.getElementById("editDosage").value = dosage;
+    document.getElementById("editBatch").value = batch;
+    document.getElementById("editExpiry").value = expiry || "";
+    document.getElementById("editRx").checked = rx === 1;
+
+    const modal = new bootstrap.Modal(document.getElementById("editMedModal"));
+    modal.show();
+  }
+</script>
+{% endblock %}

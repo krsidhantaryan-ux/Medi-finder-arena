@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'register' %}Patient Registration{% else %}Patient Sign In{% endif %} — MediFinder{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card border-0 shadow-lg rounded-4 p-4 p-md-5 bg-white">
+        <div class="text-center mb-4">
+          <div class="brand-logo justify-content-center mb-2">
+            <i class="bi bi-crosshair2 text-primary fs-3"></i>
+            <span>Medi<strong>Finder</strong></span>
+          </div>
+          <h4 class="fw-bold">{% if mode == 'register' %}Create Patient Account{% else %}Welcome Back{% endif %}</h4>
+          <p class="text-muted small">Reserve medicines instantly and track your prescriptions</p>
+        </div>
+
+        {% if mode == 'register' %}
+          <form action="{{ url_for('customer_web.register') }}" method="POST">
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-muted">FULL NAME</label>
+              <input type="text" name="name" class="form-control py-2" placeholder="e.g. Aarav Sharma" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-muted">EMAIL ADDRESS</label>
+              <input type="email" name="email" class="form-control py-2" placeholder="aarav@example.com" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-muted">PHONE NUMBER</label>
+              <input type="tel" name="phone" class="form-control py-2" placeholder="+91 98765 43210" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-muted">CITY</label>
+              <input type="text" name="city" class="form-control py-2" value="Patna" required>
+            </div>
+            <div class="mb-4">
+              <label class="form-label small fw-bold text-muted">PASSWORD (MIN 6 CHARS)</label>
+              <input type="password" name="password" class="form-control py-2" placeholder="••••••••" minlength="6" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mb-3">
+              Create Account
+            </button>
+            <div class="text-center small text-muted">
+              Already have an account? <a href="{{ url_for('customer_web.login') }}" class="fw-bold">Sign In</a>
+            </div>
+          </form>
+        {% else %}
+          <form action="{{ url_for('customer_web.login') }}" method="POST">
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-muted">EMAIL ADDRESS</label>
+              <input type="email" name="email" class="form-control py-2" placeholder="customer@medifinder.demo" required>
+            </div>
+            <div class="mb-4">
+              <label class="form-label small fw-bold text-muted">PASSWORD</label>
+              <input type="password" name="password" class="form-control py-2" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mb-3">
+              Sign In
+            </button>
+            <div class="text-center small text-muted">
+              Don't have an account? <a href="{{ url_for('customer_web.register') }}" class="fw-bold">Register here</a>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
