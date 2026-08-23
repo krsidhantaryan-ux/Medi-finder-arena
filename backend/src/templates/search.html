@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}Search Medicines & Nearby Pharmacies — MediFinder{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-5">
+  <!-- Search Filters Header -->
+  <div class="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-white">
+    <form id="searchFilterForm" class="row g-2 align-items-center">
+      <div class="col-lg-4 col-md-6 position-relative">
+        <div class="input-group">
+          <span class="input-group-text bg-white"><i class="bi bi-search text-primary"></i></span>
+          <input type="text" id="searchInput" class="form-control" placeholder="Search medicine name..." value="{{ initial_q }}" autocomplete="off">
+        </div>
+        <div id="searchAutocomplete" class="autocomplete-dropdown"></div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="input-group">
+          <span class="input-group-text bg-white"><i class="bi bi-capsule text-muted"></i></span>
+          <input type="text" id="saltInput" class="form-control" placeholder="Filter by Generic Salt..." value="{{ initial_salt }}">
+        </div>
+      </div>
+
+      <div class="col-lg-2 col-md-4">
+        <select id="categorySelect" class="form-select">
+          <option value="">All Categories</option>
+          {% for name, slug, icon in categories %}
+            <option value="{{ slug }}" {% if initial_cat == slug %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-lg-3 col-md-8 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-grow-1 fw-semibold">
+          <i class="bi bi-funnel me-1"></i> Apply Filters
+        </button>
+        <button type="button" id="locateMeBtn" class="btn btn-outline-secondary" title="Use current GPS location">
+          <i class="bi bi-crosshair"></i>
+        </button>
+      </div>
+    </form>
+
+    <!-- Quick Toggles -->
+    <div class="d-flex flex-wrap align-items-center gap-4 mt-3 pt-2 border-top small">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="inStockToggle" checked>
+        <label class="form-check-label fw-semibold" for="inStockToggle">In-Stock Only</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="open24hToggle">
+        <label class="form-check-label" for="open24hToggle">24/7 Open</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="deliveryToggle">
+        <label class="form-check-label" for="deliveryToggle">Home Delivery</label>
+      </div>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <span class="text-muted">Max Radius:</span>
+        <select id="radiusSelect" class="form-select form-select-sm" style="width: 100px;">
+          <option value="5">5 km</option>
+          <option value="15" selected>15 km</option>
+          <option value="30">30 km</option>
+          <option value="50">50 km</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Search & Map Split View -->
+  <div class="row g-4">
+    <!-- Left Column: Search Results -->
+    <div class="col-lg-7">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0" id="resultsCountHeader">Available Medicines</h5>
+        <span class="text-muted small" id="locationStatusBadge">Locating nearby pharmacies...</span>
+      </div>
+
+      <!-- Salt Substitutes Recommendation Callout -->
+      <div id="substitutesContainer" class="mb-3 d-none">
+        <div class="alert alert-info border-info border-opacity-25 rounded-3 shadow-sm py-2 px-3">
+          <div class="fw-bold small mb-1"><i class="bi bi-stars me-1 text-warning"></i> Same Active Salt Substitutes Available:</div>
+          <div id="substitutesList" class="d-flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Results List Container -->
+      <div id="medicineResultsList" class="d-flex flex-column gap-3">
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="text-muted small mt-2">Scanning pharmacy networks in your area...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Interactive Leaflet Map -->
+    <div class="col-lg-5">
+      <div class="sticky-top" style="top: 80px; z-index: 10;">
+        <div class="map-view-container">
+          <div id="map"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Medicine Reservation Modal -->
+<div class="modal fade" id="reservationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-primary">
+          <i class="bi bi-bag-plus me-1"></i> Reserve Medicine
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="p-3 bg-light rounded-3 mb-3">
+          <h6 class="fw-bold mb-1" id="resMedName">Medicine Name</h6>
+          <div class="small text-muted mb-2" id="resDosage">Dosage details</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-primary fs-5" id="resPrice">₹0.00</span>
+            <span class="badge bg-white text-dark border" id="resShopName">Pharmacy Name</span>
+          </div>
+        </div>
+
+        <form id="reservationForm" onsubmit="event.preventDefault(); MediFinder.submitReservation(this);">
+          <input type="hidden" id="resInvId">
+          <input type="hidden" id="resShopId">
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">YOUR NAME</label>
+            <input type="text" id="resName" class="form-control" placeholder="Enter full name" value="{{ session.get('customer_name', '') }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">PHONE NUMBER (FOR SMS/PICKUP)</label>
+            <input type="tel" id="resPhone" class="form-control" placeholder="+91 98765 43210" required>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-4">
+              <label class="form-label small fw-bold text-muted">QUANTITY</label>
+              <input type="number" id="resQty" class="form-control" value="1" min="1" max="10" required>
+            </div>
+            <div class="col-8">
+              <label class="form-label small fw-bold text-muted">SPECIAL NOTE (OPTIONAL)</label>
+              <input type="text" id="resNote" class="form-control" placeholder="e.g. Urgent prescription">
+            </div>
+          </div>
+
+          <div class="alert alert-warning small py-2 mb-3">
+            <i class="bi bi-clock-history me-1"></i> Stock will be held exclusively for <strong>2 hours</strong> at the pharmacy.
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
+            Confirm 2-Hour Reservation
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const mapContainerId = "map";
+    const defaultCenter = [{{ default_center[0] }}, {{ default_center[1] }}];
+
+    // Initialize Map
+    MediFinder.initSearchMap(mapContainerId, defaultCenter[0], defaultCenter[1]);
+
+    // Setup Autocomplete
+    MediFinder.initAutocomplete("searchInput", "searchAutocomplete", (name, salt) => {
+      fetchSearchResults();
+    });
+
+    // Locate Me Button
+    document.getElementById("locateMeBtn").addEventListener("click", () => {
+      MediFinder.initGeolocation((coords) => {
+        document.getElementById("locationStatusBadge").textContent = `GPS: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
+        fetchSearchResults();
+      });
+    });
+
+    // Trigger Initial Search
+    MediFinder.initGeolocation((coords) => {
+      document.getElementById("locationStatusBadge").textContent = `Location active`;
+      fetchSearchResults();
+    });
+
+    // Handle Form Submit & Filter Changes
+    document.getElementById("searchFilterForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      fetchSearchResults();
+    });
+
+    ["inStockToggle", "open24hToggle", "deliveryToggle", "radiusSelect", "categorySelect"].forEach((id) => {
+      document.getElementById(id).addEventListener("change", () => fetchSearchResults());
+    });
+
+    async function fetchSearchResults() {
+      const q = document.getElementById("searchInput").value.trim();
+      const salt = document.getElementById("saltInput").value.trim();
+      const category = document.getElementById("categorySelect").value;
+      const inStock = document.getElementById("inStockToggle").checked;
+      const open24h = document.getElementById("open24hToggle").checked;
+      const delivery = document.getElementById("deliveryToggle").checked;
+      const radius = document.getElementById("radiusSelect").value;
+      const coords = MediFinder.getUserCoords();
+
+      const params = new URLSearchParams({
+        q,
+        salt,
+        category,
+        in_stock: inStock,
+        open_24h: open24h,
+        delivery: delivery,
+        radius: radius,
+        lat: coords.lat,
+        lng: coords.lng,
+      });
+
+      const listContainer = document.getElementById("medicineResultsList");
+      listContainer.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+
+      try {
+        const res = await fetch(`/api/v1/medicines/search?${params.toString()}`);
+        const data = await res.json();
+
+        if (data.success) {
+          renderResults(data.data, data.meta);
+        } else {
+          listContainer.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        }
+      } catch (err) {
+        listContainer.innerHTML = `<div class="alert alert-danger">Failed to load medicine results. Please check your connection.</div>`;
+      }
+    }
+
+    function renderResults(medicines, meta) {
+      const listContainer = document.getElementById("medicineResultsList");
+      const countHeader = document.getElementById("resultsCountHeader");
+      const substitutesContainer = document.getElementById("substitutesContainer");
+      const substitutesList = document.getElementById("substitutesList");
+
+      countHeader.textContent = `${meta.total} Medicines Found`;
+
+      // Handle Substitutes
+      if (meta.substitutes && meta.substitutes.length > 0) {
+        substitutesContainer.classList.remove("d-none");
+        substitutesList.innerHTML = meta.substitutes
+          .map(
+            (s) => `
+            <a href="/search?q=${encodeURIComponent(s.med_name)}" class="badge bg-white text-primary border text-decoration-none py-1 px-2">
+              <strong>${s.med_name}</strong> (₹${s.price}) • ${s.pharmacy_name}
+            </a>
+          `
+          )
+          .join("");
+      } else {
+        substitutesContainer.classList.add("d-none");
+      }
+
+      if (!medicines || medicines.length === 0) {
+        listContainer.innerHTML = `
+          <div class="card border-0 p-5 text-center bg-white rounded-4 shadow-sm">
+            <i class="bi bi-emoji-frown text-muted" style="font-size: 3rem;"></i>
+            <h5 class="fw-bold mt-3 mb-1">No Matching Medicines Found</h5>
+            <p class="text-muted small">Try searching for a different generic salt name or widening your search radius.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Collect unique pharmacies for map
+      const pharmacies = [];
+      const seenPharmacies = new Set();
+
+      listContainer.innerHTML = medicines
+        .map((item) => {
+          if (!seenPharmacies.has(item.pharmacy_id)) {
+            seenPharmacies.add(item.pharmacy_id);
+            pharmacies.push({
+              id: item.pharmacy_id,
+              name: item.pharmacy_name,
+              address: item.pharmacy_address,
+              lat: item.pharmacy_lat,
+              lng: item.pharmacy_lng,
+              is_open_24h: item.pharmacy_open_24h,
+              open_time: "08:00",
+              close_time: "22:00",
+            });
+          }
+
+          const inStock = item.stock_quantity > 0;
+          return `
+          <div class="med-card">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h5 class="med-name">${item.med_name}</h5>
+                <span class="salt-badge"><i class="bi bi-activity me-1"></i>${item.salt_composition || "General Formulation"}</span>
+                <div class="small text-muted">${item.dosage || ""} ${item.manufacturer ? "• " + item.manufacturer : ""}</div>
+              </div>
+              <div class="text-end">
+                <div class="price-tag">₹${item.price.toFixed(2)}</div>
+                ${item.mrp && item.mrp > item.price ? `<span class="mrp-strike">MRP ₹${item.mrp.toFixed(2)}</span>` : ""}
+              </div>
+            </div>
+
+            <div class="p-2 bg-light rounded-3 my-2 d-flex justify-content-between align-items-center">
+              <div>
+                <a href="/pharmacy/${item.pharmacy_id}" class="fw-bold text-dark text-decoration-none small">
+                  <i class="bi bi-shop me-1 text-primary"></i> ${item.pharmacy_name}
+                </a>
+                <div class="text-muted small">${item.pharmacy_address || ""}</div>
+              </div>
+              <div class="text-end">
+                ${
+                  item.distance_km !== null
+                    ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle">${item.distance_km} km away</span>`
+                    : ""
+                }
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+              <div>
+                ${
+                  inStock
+                    ? `<span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle me-1"></i> In Stock (${item.stock_quantity} available)</span>`
+                    : `<span class="badge bg-danger-subtle text-danger"><i class="bi bi-x-circle me-1"></i> Out of Stock</span>`
+                }
+                ${item.prescription ? `<span class="badge bg-warning-subtle text-warning-emphasis ms-1">Rx Required</span>` : ""}
+              </div>
+              <div>
+                ${
+                  inStock
+                    ? `
+                  <button class="btn btn-sm btn-primary px-3 fw-semibold" onclick="MediFinder.openReservationModal('${item.id}', '${item.pharmacy_id}', '${item.med_name.replace(/'/g, "\\'")}', '${(item.dosage || "").replace(/'/g, "\\'")}', ${item.price}, '${item.pharmacy_name.replace(/'/g, "\\'")}')">
+                    <i class="bi bi-bag-plus me-1"></i> Reserve Now
+                  </button>
+                `
+                    : `
+                  <button class="btn btn-sm btn-outline-secondary px-3" disabled>Unavailable</button>
+                `
+                }
+              </div>
+            </div>
+          </div>
+        `;
+        })
+        .join("");
+
+      // Render map pins
+      MediFinder.renderPharmacyMarkers(pharmacies);
+    }
+  });
+</script>
+{% endblock %}

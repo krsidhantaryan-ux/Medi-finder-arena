@@ -1,0 +1,3 @@
+"""
+MediFinder Core Module.
+"""

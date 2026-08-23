@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}{{ shop.name }} — Pharmacy Profile & Inventory | MediFinder{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Pharmacy Header Card -->
+  <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
+    <div class="bg-primary bg-gradient text-white p-4 p-md-5">
+      <div class="row align-items-center g-4">
+        <div class="col-md-8">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-success small"><i class="bi bi-shield-check me-1"></i> Verified Pharmacy</span>
+            {% if shop.is_open_24h %}
+              <span class="badge bg-warning text-dark small"><i class="bi bi-clock-history me-1"></i> Open 24/7</span>
+            {% else %}
+              <span class="badge bg-white text-dark small">{{ shop.open_time }} - {{ shop.close_time }}</span>
+            {% endif %}
+            {% if shop.delivery %}
+              <span class="badge bg-info text-dark small"><i class="bi bi-truck me-1"></i> Home Delivery</span>
+            {% endif %}
+          </div>
+
+          <h2 class="fw-bold mb-2">{{ shop.name }}</h2>
+          <p class="mb-2 opacity-90"><i class="bi bi-geo-alt me-1"></i> {{ shop.address }}, {{ shop.city }}, {{ shop.state }} - {{ shop.pincode }}</p>
+          <div class="d-flex flex-wrap gap-3 small opacity-90">
+            <span><i class="bi bi-telephone me-1"></i> {{ shop.phone }}</span>
+            {% if shop.license_number %}
+              <span><i class="bi bi-file-earmark-medical me-1"></i> License: {{ shop.license_number }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="col-md-4 text-md-end">
+          {% if shop.rating %}
+            <div class="bg-white bg-opacity-10 p-3 rounded-3 d-inline-block text-start border border-white border-opacity-25">
+              <div class="fs-3 fw-bold"><i class="bi bi-star-fill text-warning me-1"></i> {{ shop.rating }} <span class="fs-6 opacity-75">/ 5</span></div>
+              <div class="small opacity-75">{{ shop.total_reviews }} Customer Reviews</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Column: Live Store Inventory -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">Current Medicine Stock ({{ inventory|length }})</h5>
+          <input type="text" id="inventorySearch" class="form-control form-control-sm w-50" placeholder="Filter store stock...">
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle table-hover custom-table" id="inventoryTable">
+            <thead>
+              <tr>
+                <th>Medicine / Generic</th>
+                <th>Dosage</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in inventory %}
+                <tr>
+                  <td>
+                    <div class="fw-bold text-dark">{{ item.med_name }}</div>
+                    <div class="small text-muted">{{ item.salt_composition }}</div>
+                  </td>
+                  <td class="small">{{ item.dosage or 'Standard' }}</td>
+                  <td>
+                    <span class="fw-bold text-primary">₹{{ "%.2f"|format(item.price) }}</span>
+                    {% if item.mrp and item.mrp > item.price %}
+                      <span class="mrp-strike">₹{{ "%.2f"|format(item.mrp) }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if item.stock_quantity > 0 %}
+                      <span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle me-1"></i> In Stock ({{ item.stock_quantity }})</span>
+                    {% else %}
+                      <span class="badge bg-danger-subtle text-danger">Out of Stock</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if item.stock_quantity > 0 %}
+                      <button class="btn btn-sm btn-outline-primary" onclick="MediFinder.openReservationModal('{{ item.id }}', '{{ shop.id }}', '{{ item.med_name }}', '{{ item.dosage }}', {{ item.price }}, '{{ shop.name }}')">
+                        <i class="bi bi-bag-plus"></i> Reserve
+                      </button>
+                    {% else %}
+                      <button class="btn btn-sm btn-light text-muted" disabled>Unavailable</button>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="text-center py-4 text-muted">No medicines currently listed.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Store Details & Reviews -->
+    <div class="col-lg-4">
+      <!-- Store Info -->
+      <div class="card border-0 shadow-sm rounded-4 p-3 bg-white mb-4">
+        <h6 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-1"></i> About Pharmacy</h6>
+        <p class="small text-muted mb-3">{{ shop.description or 'No store description provided.' }}</p>
+        
+        <ul class="list-group list-group-flush small">
+          <li class="list-group-item px-0 d-flex justify-content-between">
+            <span class="text-muted">Working Hours</span>
+            <span class="fw-semibold">{% if shop.is_open_24h %}24 Hours Open{% else %}{{ shop.open_time }} - {{ shop.close_time }}{% endif %}</span>
+          </li>
+          <li class="list-group-item px-0 d-flex justify-content-between">
+            <span class="text-muted">Home Delivery</span>
+            <span class="fw-semibold">{% if shop.delivery %}Available{% else %}Pickup Only{% endif %}</span>
+          </li>
+          <li class="list-group-item px-0 d-flex justify-content-between">
+            <span class="text-muted">City</span>
+            <span class="fw-semibold">{{ shop.city }}, {{ shop.state }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Customer Reviews -->
+      <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
+        <h6 class="fw-bold mb-3"><i class="bi bi-star-fill text-warning me-1"></i> Customer Reviews</h6>
+
+        <div class="d-flex flex-column gap-2 mb-3">
+          {% for r in reviews %}
+            <div class="p-2 border rounded-3 bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold small">{{ r.customer_name }}</span>
+                <span class="text-warning small"><i class="bi bi-star-fill"></i> {{ r.rating }}</span>
+              </div>
+              <p class="small text-muted mb-0">{{ r.comment or 'Verified transaction.' }}</p>
+            </div>
+          {% else %}
+            <p class="small text-muted mb-0">No reviews yet. Be the first to review!</p>
+          {% endfor %}
+        </div>
+
+        <!-- Submit Review Form -->
+        <form id="reviewForm" class="border-top pt-3" onsubmit="event.preventDefault(); submitShopReview('{{ shop.id }}');">
+          <h6 class="small fw-bold mb-2">Leave a Rating</h6>
+          <div class="mb-2">
+            <select id="reviewRating" class="form-select form-select-sm" required>
+              <option value="5">⭐⭐⭐⭐⭐ (5/5 Excellent)</option>
+              <option value="4">⭐⭐⭐⭐ (4/5 Good)</option>
+              <option value="3">⭐⭐⭐ (3/5 Average)</option>
+              <option value="2">⭐⭐ (2/5 Poor)</option>
+              <option value="1">⭐ (1/5 Terrible)</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <input type="text" id="reviewComment" class="form-control form-control-sm" placeholder="Your experience..." required>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary w-100 fw-semibold">Submit Review</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Medicine Reservation Modal -->
+<div class="modal fade" id="reservationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-primary">
+          <i class="bi bi-bag-plus me-1"></i> Reserve Medicine
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="p-3 bg-light rounded-3 mb-3">
+          <h6 class="fw-bold mb-1" id="resMedName">Medicine Name</h6>
+          <div class="small text-muted mb-2" id="resDosage">Dosage details</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-primary fs-5" id="resPrice">₹0.00</span>
+            <span class="badge bg-white text-dark border" id="resShopName">Pharmacy Name</span>
+          </div>
+        </div>
+
+        <form id="reservationForm" onsubmit="event.preventDefault(); MediFinder.submitReservation(this);">
+          <input type="hidden" id="resInvId">
+          <input type="hidden" id="resShopId">
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">YOUR NAME</label>
+            <input type="text" id="resName" class="form-control" placeholder="Enter full name" value="{{ session.get('customer_name', '') }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">PHONE NUMBER</label>
+            <input type="tel" id="resPhone" class="form-control" placeholder="+91 98765 43210" required>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-4">
+              <label class="form-label small fw-bold text-muted">QUANTITY</label>
+              <input type="number" id="resQty" class="form-control" value="1" min="1" max="10" required>
+            </div>
+            <div class="col-8">
+              <label class="form-label small fw-bold text-muted">SPECIAL NOTE</label>
+              <input type="text" id="resNote" class="form-control" placeholder="e.g. Need immediate pickup">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
+            Confirm 2-Hour Reservation
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Live filter on pharmacy inventory table
+  document.getElementById("inventorySearch").addEventListener("input", function(e) {
+    const term = e.target.value.toLowerCase();
+    const rows = document.querySelectorAll("#inventoryTable tbody tr");
+    rows.forEach(row => {
+      row.style.display = row.innerText.toLowerCase().includes(term) ? "" : "none";
+    });
+  });
+
+  async function submitShopReview(shopId) {
+    const rating = document.getElementById("reviewRating").value;
+    const comment = document.getElementById("reviewComment").value;
+
+    try {
+      const res = await fetch(`/api/v1/reviews/${shopId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating, comment })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Thank you! Your review was submitted.");
+        window.location.reload();
+      } else {
+        alert(data.error || "Failed to submit review.");
+      }
+    } catch(err) {
+      alert("Network error. Please try again.");
+    }
+  }
+</script>
+{% endblock %}

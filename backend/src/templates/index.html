@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}MediFinder — Live Medicine Stock & Pharmacy Locator{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section text-center">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-9">
+        <span class="badge bg-white text-primary px-3 py-2 rounded-pill fw-semibold mb-3 shadow-sm">
+          <i class="bi bi-geo-alt-fill text-danger me-1"></i> Live Real-Time Availability Network
+        </span>
+        <h1 class="hero-title">Find Medicines In-Stock Near You</h1>
+        <p class="hero-subtitle">
+          Search genuine prescription & OTC medicines, compare prices across verified pharmacies, and reserve for instant pickup.
+        </p>
+
+        <!-- Search Bar with Live Autocomplete -->
+        <div class="search-box-card text-start text-dark mt-4">
+          <form action="{{ url_for('public_web.search_page') }}" method="GET" class="row g-2 align-items-center">
+            <div class="col-md-7 position-relative">
+              <label class="form-label small fw-bold text-muted mb-1">MEDICINE OR GENERIC SALT</label>
+              <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="heroSearchInput" name="q" class="form-control border-start-0 py-2" placeholder="e.g. Dolo 650, Paracetamol, Augmentin, Insulin..." autocomplete="off">
+              </div>
+              <div id="heroAutocompleteDropdown" class="autocomplete-dropdown"></div>
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-muted mb-1">CATEGORY</label>
+              <select name="category" class="form-select py-2">
+                <option value="">All Categories</option>
+                {% for name, slug, icon in categories %}
+                  <option value="{{ slug }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-2 d-grid align-self-end">
+              <button type="submit" class="btn btn-primary py-2 fw-semibold">
+                <i class="bi bi-arrow-right-circle me-1"></i> Search
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Quick Filters -->
+        <div class="d-flex flex-wrap justify-content-center gap-2 mt-3 text-white small">
+          <span class="opacity-75">Popular:</span>
+          <a href="{{ url_for('public_web.search_page') }}?q=Dolo+650" class="badge bg-white bg-opacity-25 text-white text-decoration-none py-2 px-3">Dolo 650</a>
+          <a href="{{ url_for('public_web.search_page') }}?q=Paracetamol" class="badge bg-white bg-opacity-25 text-white text-decoration-none py-2 px-3">Paracetamol</a>
+          <a href="{{ url_for('public_web.search_page') }}?q=Augmentin" class="badge bg-white bg-opacity-25 text-white text-decoration-none py-2 px-3">Augmentin</a>
+          <a href="{{ url_for('public_web.search_page') }}?category=diabetes" class="badge bg-white bg-opacity-25 text-white text-decoration-none py-2 px-3">Diabetes Care</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- System Metrics Ribbon -->
+<section class="py-4 border-bottom bg-white">
+  <div class="container">
+    <div class="row text-center g-3">
+      <div class="col-md-4">
+        <h3 class="fw-bold text-primary mb-0">{{ stats.medicines }}+</h3>
+        <p class="text-muted small mb-0">Active Medicine Records</p>
+      </div>
+      <div class="col-md-4 border-start border-end">
+        <h3 class="fw-bold text-success mb-0">{{ stats.shops }}+</h3>
+        <p class="text-muted small mb-0">Verified Partner Pharmacies</p>
+      </div>
+      <div class="col-md-4">
+        <h3 class="fw-bold text-info mb-0">2-Hour</h3>
+        <p class="text-muted small mb-0">Guaranteed Stock Hold Window</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Categories Section -->
+<section class="py-5">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h4 class="fw-bold mb-1">Browse by Healthcare Category</h4>
+        <p class="text-muted small mb-0">Explore medications, wellness essentials, and medical supplies.</p>
+      </div>
+      <a href="{{ url_for('public_web.search_page') }}" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+
+    <div class="row g-3">
+      {% for name, slug, icon in categories[:8] %}
+        <div class="col-6 col-md-3">
+          <a href="{{ url_for('public_web.search_page') }}?category={{ slug }}" class="category-card">
+            <i class="bi {{ icon }} category-icon"></i>
+            <h6 class="fw-bold mb-1">{{ name }}</h6>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Top Verified Pharmacies -->
+<section class="py-5 bg-white border-top border-bottom">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h4 class="fw-bold mb-1">Featured Verified Pharmacies</h4>
+        <p class="text-muted small mb-0">Locally licensed chemist shops ready for instant pickup.</p>
+      </div>
+      <a href="{{ url_for('public_web.search_page') }}" class="btn btn-sm btn-outline-primary">Browse Map</a>
+    </div>
+
+    <div class="row g-4">
+      {% for shop in top_shops %}
+        <div class="col-md-4">
+          <div class="card h-100 border rounded-3 p-3 shadow-sm">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h6 class="fw-bold text-primary mb-0">{{ shop.name }}</h6>
+              {% if shop.is_open_24h %}
+                <span class="badge bg-success small">24/7 Open</span>
+              {% else %}
+                <span class="badge bg-light text-dark border small">{{ shop.open_time }} - {{ shop.close_time }}</span>
+              {% endif %}
+            </div>
+            <p class="text-muted small mb-3"><i class="bi bi-geo-alt me-1 text-danger"></i> {{ shop.address }}</p>
+            
+            <div class="mt-auto d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="text-warning small fw-bold">
+                <i class="bi bi-star-fill me-1"></i> {{ shop.rating }} ({{ shop.review_count }})
+              </span>
+              <a href="{{ url_for('public_web.pharmacy_profile', shop_id=shop.id) }}" class="btn btn-sm btn-outline-primary">
+                View Stock <i class="bi bi-arrow-right ms-1"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    MediFinder.initGeolocation();
+    MediFinder.initAutocomplete("heroSearchInput", "heroAutocompleteDropdown", (name, salt) => {
+      window.location.href = `/search?q=${encodeURIComponent(name)}`;
+    });
+  });
+</script>
+{% endblock %}

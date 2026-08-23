@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+htmlcov
+.coverage
+mongo-data
+backend/src/static/uploads/*
+!backend/src/static/uploads/.gitkeep
